@@ -1323,13 +1323,13 @@ className="w-28 sm:w-36 rounded-full bg-[#3c4043] px-4 py-2 text-sm text-white p
     </button>
 
     {/* Chat */}
-    <button
+    {/* <button
       onClick={() => setChatOpen(true)}
       className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-[#3c4043] text-xl transition hover:scale-105 hover:bg-[#4b4f52] cursor-pointer"
       title="Chat"
     >
       💬
-    </button>
+    </button> */}
 
     {/* Leave */}
     <button
