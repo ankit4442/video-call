@@ -23,6 +23,20 @@ function App() {
     socket.emit("join-room", roomId);
     console.log("Joined Room:", roomId);
   };
+  const disconnectCall = () => {
+  if (roomId) {
+    socket.emit("leave-room", roomId);
+  }
+
+  peerRef.current?.close();
+  peerRef.current = null;
+
+  if (remoteVideoRef.current) {
+    remoteVideoRef.current.srcObject = null;
+  }
+
+  console.log("Disconnected");
+};
 
   useEffect(() => {
     socket.on("connect", () => {
@@ -199,80 +213,121 @@ function App() {
       socket.off("ice-candidate");
     };
   }, []);
-    return (
+   return (
+  <div
+    style={{
+      minHeight: "100vh",
+      background: "#f5f5f5",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      padding: "20px",
+      boxSizing: "border-box",
+    }}
+  >
+    <h1 style={{ marginBottom: "20px" }}>2 Person Video Call</h1>
+
     <div
       style={{
-        padding: "20px",
         display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: "20px",
+        flexWrap: "wrap",
+        justifyContent: "center",
+        gap: "10px",
+        width: "100%",
+        maxWidth: "600px",
+        marginBottom: "20px",
       }}
     >
-      <h1>2 Person Video Call</h1>
-
-      <div>
-        <input
-          type="text"
-          placeholder="Enter Room ID"
-          value={roomId}
-          onChange={(e) => setRoomId(e.target.value)}
-          style={{
-            padding: "10px",
-            marginRight: "10px",
-          }}
-        />
-
-        <button
-          onClick={joinRoom}
-          style={{
-            padding: "10px 20px",
-            cursor: "pointer",
-          }}
-        >
-          Join Room
-        </button>
-      </div>
-
-      <div
+      <input
+        type="text"
+        placeholder="Enter Room ID"
+        value={roomId}
+        onChange={(e) => setRoomId(e.target.value)}
         style={{
-          display: "flex",
-          gap: "20px",
+          flex: 1,
+          minWidth: "180px",
+          padding: "12px",
+          borderRadius: "8px",
+          border: "1px solid #ccc",
+          fontSize: "16px",
+        }}
+      />
+
+      <button
+        onClick={joinRoom}
+        style={{
+          padding: "12px 20px",
+          background: "#2563eb",
+          color: "#fff",
+          border: "none",
+          borderRadius: "8px",
+          cursor: "pointer",
         }}
       >
-        <div>
-          <h3>Local Video</h3>
+        Join
+      </button>
 
-          <video
-            ref={localVideoRef}
-            autoPlay
-            muted
-            playsInline
-            style={{
-              width: "400px",
-              border: "2px solid black",
-              borderRadius: "10px",
-            }}
-          />
-        </div>
+      <button
+        onClick={disconnectCall}
+        style={{
+          padding: "12px 20px",
+          background: "#dc2626",
+          color: "#fff",
+          border: "none",
+          borderRadius: "8px",
+          cursor: "pointer",
+        }}
+      >
+        Disconnect
+      </button>
+    </div>
 
-        <div>
-          <h3>Remote Video</h3>
+    <div
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        justifyContent: "center",
+        gap: "20px",
+        width: "100%",
+      }}
+    >
+      <div style={{ textAlign: "center" }}>
+        <h3>Local Video</h3>
 
-          <video
-            ref={remoteVideoRef}
-            autoPlay
-            playsInline
-            style={{
-              width: "400px",
-              border: "2px solid red",
-              borderRadius: "10px",
-            }}
-          />
-        </div>
+        <video
+          ref={localVideoRef}
+          autoPlay
+          muted
+          playsInline
+          style={{
+            width: "100%",
+            maxWidth: "450px",
+            background: "#000",
+            borderRadius: "10px",
+            border: "2px solid #222",
+          }}
+        />
+      </div>
+
+      <div style={{ textAlign: "center" }}>
+        <h3>Remote Video</h3>
+
+        <video
+          ref={remoteVideoRef}
+          autoPlay
+          playsInline
+          style={{
+            width: "100%",
+            maxWidth: "450px",
+            background: "#000",
+            borderRadius: "10px",
+            border: "2px solid red",
+          }}
+        />
       </div>
     </div>
-  );
+  </div>
+);
 }
 
 export default App;
