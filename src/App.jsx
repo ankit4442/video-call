@@ -512,7 +512,6 @@
 
 // export default App;
 
-
 import { useEffect, useRef, useState } from "react";
 import socket from "./socket";
 import { createPeerConnection } from "./peer";
@@ -524,13 +523,15 @@ function App() {
   const [cameraOn, setCameraOn] = useState(true);
   const [screenSharing, setScreenSharing] = useState(false);
    const [fullScreen,setFullScreen] = useState(false);
-
+const [chatOpen,setChatOpen] = useState(false);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
 
   const peerRef = useRef(null);
   const localStreamRef = useRef(null);
   const screenStreamRef = useRef(null);
+  const [message,setMessage] = useState("");
+const [messages,setMessages] = useState([]);
 
   useEffect(() => {
     startCamera();
@@ -621,87 +622,139 @@ function App() {
     }
   };
 
-  useEffect(() => {
-    socket.on("user-joined", async () => {
-      console.log("User Joined");
+ useEffect(() => {
+
+  socket.on("user-joined", async () => {
+    console.log("User Joined");
+
+    if (!peerRef.current) return;
+
+    await createOffer();
+  });
+
+
+  socket.on("offer", async ({ offer }) => {
+    try {
+      console.log("Offer Received");
 
       if (!peerRef.current) return;
 
-      await createOffer();
-    });
+      await peerRef.current.setRemoteDescription(
+        new RTCSessionDescription(offer)
+      );
 
-    socket.on("offer", async ({ offer }) => {
-      try {
-        console.log("Offer Received");
+      const answer = await peerRef.current.createAnswer();
 
-        if (!peerRef.current) return;
+      await peerRef.current.setLocalDescription(answer);
 
-        await peerRef.current.setRemoteDescription(
-          new RTCSessionDescription(offer)
-        );
-
-        const answer = await peerRef.current.createAnswer();
-
-        await peerRef.current.setLocalDescription(answer);
-
-        socket.emit("answer", {
-          roomId,
-          answer,
-        });
-
-        console.log("Answer Sent");
-      } catch (err) {
-        console.log(err);
-      }
-    });
-
-    socket.on("answer", async ({ answer }) => {
-      try {
-        console.log("Answer Received");
-
-        if (!peerRef.current) return;
-
-        await peerRef.current.setRemoteDescription(
-          new RTCSessionDescription(answer)
-        );
-      } catch (err) {
-        console.log(err);
-      }
-    });
-
-    peerRef.current &&
-      (peerRef.current.onicecandidate = (event) => {
-        if (event.candidate) {
-          socket.emit("ice-candidate", {
-            roomId,
-            candidate: event.candidate,
-          });
-
-          console.log("ICE Candidate Sent");
-        }
+      socket.emit("answer", {
+        roomId,
+        answer,
       });
 
-    socket.on("ice-candidate", async ({ candidate }) => {
-      try {
-        if (candidate && peerRef.current) {
-          await peerRef.current.addIceCandidate(
-            new RTCIceCandidate(candidate)
-          );
+      console.log("Answer Sent");
 
-          console.log("ICE Candidate Added");
-        }
-      } catch (err) {
-        console.log(err);
+    } catch (err) {
+      console.log(err);
+    }
+  });
+
+
+
+  socket.on("answer", async ({ answer }) => {
+    try {
+
+      console.log("Answer Received");
+
+      if (!peerRef.current) return;
+
+      await peerRef.current.setRemoteDescription(
+        new RTCSessionDescription(answer)
+      );
+
+    } catch(err){
+      console.log(err);
+    }
+  });
+
+
+
+  socket.on("ice-candidate", async ({ candidate }) => {
+
+    try {
+
+      if(candidate && peerRef.current){
+
+        await peerRef.current.addIceCandidate(
+          new RTCIceCandidate(candidate)
+        );
+
+        console.log("ICE Candidate Added");
+
       }
-    });
 
-    return () => {
-      socket.off("user-joined");
-      socket.off("offer");
-      socket.off("answer");
-      socket.off("ice-candidate");
-    };
-  }, [roomId]);
+    } catch(err){
+      console.log(err);
+    }
+
+  });
+
+
+
+  // 💬 CHAT RECEIVE
+  socket.on("receive-message",(msg)=>{
+
+    setMessages((prev)=>[
+      ...prev,
+      msg
+    ]);
+
+  });
+
+
+
+  // CLEANUP
+  return () => {
+
+    socket.off("user-joined");
+    socket.off("offer");
+    socket.off("answer");
+    socket.off("ice-candidate");
+
+    // chat cleanup
+    socket.off("receive-message");
+
+  };
+
+
+}, [roomId]);
+
+
+const sendMessage = () => {
+
+  if(!message.trim()) return;
+
+  const msg = {
+    text: message,
+    sender: socket.id
+  };
+
+
+  socket.emit("send-message", {
+    roomId,
+    msg
+  });
+
+
+  setMessages((prev)=>[
+    ...prev,
+    msg
+  ]);
+
+
+  setMessage("");
+
+};
     const toggleMic = () => {
     const audioTrack = localStreamRef.current
       ?.getAudioTracks()[0];
@@ -850,32 +903,35 @@ function App() {
     }
   };
 
-  const leaveRoom = () => {
-    try {
-      if (roomId) {
-        socket.emit("leave-room", roomId);
-      }
-
-      peerRef.current?.close();
-
-      peerRef.current = createPeerConnection(
-        localStreamRef.current,
-        remoteVideoRef,
-        socket,
-        roomId
-      );
-
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = null;
-      }
-
-      setConnected(false);
-
-      console.log("Room Left");
-    } catch (err) {
-      console.log(err);
+ const leaveRoom = () => {
+  try {
+    if (roomId) {
+      socket.emit("leave-room", roomId);
     }
-  };
+
+    peerRef.current?.close();
+
+    peerRef.current = createPeerConnection(
+      localStreamRef.current,
+      remoteVideoRef,
+      socket,
+      roomId
+    );
+
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = null;
+    }
+
+    setConnected(false);
+
+    console.log("Room Left");
+
+    // Redirect to Google
+    window.location.href = "https://www.google.com";
+  } catch (err) {
+    console.log(err);
+  }
+};
 
   useEffect(() => {
     return () => {
@@ -894,244 +950,231 @@ function App() {
   }, []);
 
 
-const btn={
- width:"55px",
- height:"55px",
- borderRadius:"50%",
- border:"none",
- background:"#3c4043",
- color:"white",
- fontSize:"22px",
- cursor:"pointer"
-};
+const controlBtn =
+  "h-14 w-14 rounded-full bg-[#3c4043] hover:bg-[#4b4f52] text-white text-xl flex items-center justify-center transition-all duration-200 active:scale-95";
 
 return (
-  
-  <div
-    style={{
-      height:"100vh",
-      width:"100%",
-      background:"#202124",
-      color:"white",
-      display:"flex",
-      flexDirection:"column",
-      overflow:"hidden"
-    }}
-  >
+  <div className="h-screen w-full bg-[#202124] text-white flex flex-col overflow-hidden">
 
     {/* TOP BAR */}
-    <div
-      style={{
-        height:"60px",
-        background:"#18191a",
-        display:"flex",
-        alignItems:"center",
-        justifyContent:"space-between",
-        padding:"0 20px"
-      }}
-    >
-
-      <h3>
+    <div className="h-[60px] bg-[#18191a] flex items-center justify-between px-5">
+      <h3 className="text-lg font-semibold">
         🎥 Room: {roomId || "No Room"}
       </h3>
 
-
-      {!connected && (
-
-        <div
-          style={{
-            display:"flex",
-            gap:"8px"
-          }}
-        >
-
-       
-
-        </div>
-
-      )}
-
-
-
       <span
-        style={{
-          color:connected ? "#34a853":"#ea4335"
-        }}
+        className={`font-medium ${
+          connected ? "text-green-500" : "text-red-500"
+        }`}
       >
-        ● {connected ? "Connected":"Offline"}
+        ● {connected ? "Connected" : "Offline"}
       </span>
-
-
     </div>
 
-
-
-
-
     {/* VIDEO SECTION */}
-
     <div
-      style={{
-        flex:1,
-        position:"relative",
-        display:fullScreen ? "block":"flex",
-        gap:"10px",
-        padding:"10px"
-      }}
-    >
-
-
+  className={`flex-1 relative gap-3 p-3 ${
+    fullScreen
+      ? "block"
+      : "flex flex-col lg:flex-row"
+  }`}
+>
       {/* REMOTE VIDEO */}
-
       <video
         ref={remoteVideoRef}
         autoPlay
         playsInline
-        style={{
-          width:fullScreen ? "100%" : "70%",
-          height:"100%",
-          objectFit:"cover",
-          background:"#000",
-          borderRadius:"12px"
-        }}
+        className={`bg-black rounded-xl object-cover
+${
+  fullScreen
+    ? "w-full h-full"
+    : "w-full lg:w-[70%] h-[55vh] lg:h-full"
+}`}
       />
 
-
-
       {/* LOCAL VIDEO */}
-
-      <div
-        style={{
-          position:fullScreen ? "absolute":"relative",
-          right:fullScreen ? "25px":"0",
-          bottom:fullScreen ? "25px":"0",
-          width:fullScreen ? "180px":"30%",
-          height:fullScreen ? "120px":"100%",
-          borderRadius:"12px",
-          overflow:"hidden",
-          border:"2px solid white",
-          background:"#000"
-        }}
-      >
-
+     <div
+  className={`overflow-hidden rounded-xl border-2 border-white bg-black
+${
+  fullScreen
+    ? "absolute bottom-4 right-4 w-28 h-20 sm:w-40 sm:h-28"
+    : "relative w-full lg:w-[30%] h-52 lg:h-full"
+}`}
+>
         <video
           ref={localVideoRef}
           autoPlay
           muted
           playsInline
-          style={{
-            width:"100%",
-            height:"100%",
-            objectFit:"cover"
-          }}
+          className="h-full w-full object-cover"
         />
-
       </div>
-
-
     </div>
 
+    {/* CHAT BOX */}
+    {chatOpen && (
+<div className="absolute right-0 top-0 z-20 flex h-full w-full sm:w-[350px] flex-col bg-[#303134] p-4 shadow-[-5px_0_15px_rgba(0,0,0,0.4)]">
 
-
-
-
-
-    {/* CONTROL BAR */}
-
-    <div
-      style={{
-        height:"80px",
-        background:"#18191a",
-        display:"flex",
-        justifyContent:"center",
-        alignItems:"center",
-        gap:"15px"
-      }}
-    >
-   <input
-            value={roomId}
-            onChange={(e)=>setRoomId(e.target.value)}
-            placeholder="Room ID"
-            style={{
-              padding:"10px",
-              borderRadius:"8px",
-              border:"none",
-              outline:"none"
-            }}
-          />
-
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">
+            💬 Chat
+          </h3>
 
           <button
-            onClick={joinRoom}
-            style={btn}
+            onClick={() => setChatOpen(false)}
+            className="text-2xl hover:text-red-400"
           >
-            Join
+            ✕
           </button>
+        </div>
 
-      <button
-        onClick={toggleMic}
-        style={btn}
-      >
-        {isMuted ? "🔇":"🎤"}
-      </button>
+        {/* Messages */}
+        <div className="mt-3 flex-1 overflow-y-auto space-y-2">
+          {messages.map((msg, index) => (
+            <div
+              key={index}
+              className="rounded-xl bg-[#3c4043] p-3"
+            >
+              {msg.text}
+            </div>
+          ))}
+        </div>
 
+        {/* Input */}
+        <div className="mt-3 flex gap-2">
+          <input
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Message..."
+            className="flex-1 rounded-lg border-none px-3 py-2 text-black outline-none"
+          />
 
+          <button
+            onClick={sendMessage}
+            className="rounded-lg bg-blue-600 px-4 hover:bg-blue-700"
+          >
+            ➤
+          </button>
+        </div>
+      </div>
+    )}
+        {/* CONTROL BAR */}
+<div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-50 w-full px-2">
+<div
+  className="
+  mx-auto
+  flex
+  w-full
+  max-w-5xl
+  flex-wrap
+  items-center
+  justify-center
+  gap-2
+  rounded-3xl
+  border
+  border-gray-700
+  bg-[#202124]/95
+  px-3
+  py-3
+  backdrop-blur-md
+  shadow-2xl
+"
+>
 
-      <button
-        onClick={toggleCamera}
-        style={btn}
-      >
-        {cameraOn ? "📷":"🚫"}
-      </button>
+    {/* Room ID */}
+    <input
+      value={roomId}
+      onChange={(e) => setRoomId(e.target.value)}
+      placeholder="Room ID"
+className="w-28 sm:w-36 rounded-full bg-[#3c4043] px-4 py-2 text-sm text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500"
+    />
 
+    {/* Join */}
+    <button
+      onClick={joinRoom}
+      className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-green-600 text-xl transition hover:scale-105 hover:bg-green-700 cursor-pointer"
+      title="Join"
+    >
+      📞
+    </button>
 
+    {/* Mic */}
+    <button
+      onClick={toggleMic}
+      className={`flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full text-xl transition hover:scale-105 cursor-pointer ${
+        isMuted
+          ? "bg-red-600 hover:bg-red-700"
+          : "bg-[#3c4043] hover:bg-[#4b4f52]"
+      }`}
+      title="Microphone"
+    >
+      {isMuted ? "🔇" : "🎤"}
+    </button>
 
-      {!screenSharing ?
+    {/* Camera */}
+    <button
+      onClick={toggleCamera}
+      className={`flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full text-xl transition hover:scale-105 cursor-pointer ${
+        cameraOn
+          ? "bg-[#3c4043] hover:bg-[#4b4f52]"
+          : "bg-red-600 hover:bg-red-700"
+      }`}
+      title="Camera"
+    >
+      {cameraOn ? "📷" : "🚫"}
+    </button>
 
+    {/* Screen Share */}
+    {!screenSharing ? (
       <button
         onClick={shareScreen}
-        style={btn}
+        className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-[#3c4043] text-xl transition hover:scale-105 hover:bg-[#4b4f52] cursor-pointer"
+        title="Share Screen"
       >
         🖥️
       </button>
-
-      :
-
+    ) : (
       <button
         onClick={stopScreenShare}
-        style={btn}
+        className="rounded-full bg-orange-500 px-5 py-2 font-medium transition hover:bg-orange-600 cursor-pointer"
       >
         Stop
       </button>
+    )}
 
-      }
+    {/* Full Screen */}
+    <button
+      onClick={() => setFullScreen(!fullScreen)}
+      className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-[#3c4043] text-xl transition hover:scale-105 hover:bg-[#4b4f52]"
+      title="Fullscreen"
+    >
+      {fullScreen ? "↙️" : "↗️"}
+    </button>
 
+    {/* Chat */}
+    <button
+      onClick={() => setChatOpen(true)}
+      className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-[#3c4043] text-xl transition hover:scale-105 hover:bg-[#4b4f52] cursor-pointer"
+      title="Chat"
+    >
+      💬
+    </button>
 
-
-      <button
-        onClick={()=>setFullScreen(!fullScreen)}
-        style={btn}
-      >
-        {fullScreen ? "↙️":"↗️"}
-      </button>
-
-
-
-      <button
-        onClick={leaveRoom}
-        style={{
-          ...btn,
-          background:"#ea4335"
-        }}
-      >
-        ☎
-      </button>
-
-
-    </div>
-
+    {/* Leave */}
+    <button
+      onClick={leaveRoom}
+      className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-red-600 text-xl transition hover:scale-105 hover:bg-red-700 cursor-pointer"
+      title="Leave Call"
+    >
+      ☎
+    </button>
 
   </div>
+</div>
+
+  </div>
+  
 );
 }
 
