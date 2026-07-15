@@ -1094,7 +1094,7 @@ const sendMessage = () => {
     console.log("Room Left");
 
     // Redirect to Google
-    window.location.href = "https://www.google.com";
+    window.close()
   } catch (err) {
     console.log(err);
   }
