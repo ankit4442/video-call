@@ -8,61 +8,100 @@
 
 
 
-import { io } from "socket.io-client";
 
+
+import { io } from "socket.io-client";
+ 
 const SOCKET_SERVER_URL =
   import.meta.env.VITE_SOCKET_SERVER_URL ||
   "https://video-call-server-h95a.onrender.com";
-
+ 
 const socket = io(SOCKET_SERVER_URL, {
-  /*
-   * WebSocket fail hone par polling fallback available rahega.
-   */
-  transports: ["websocket", "polling"],
-
+  transports: ["polling", "websocket"],
+  upgrade: true,
+  rememberUpgrade: false,
+ 
   reconnection: true,
-  reconnectionAttempts: 10,
+  reconnectionAttempts: 20,
   reconnectionDelay: 1000,
   reconnectionDelayMax: 5000,
-
-  timeout: 20000,
-
-  /*
-   * Socket import hote hi connect ho jayega.
-   */
+ 
+  timeout: 30000,
   autoConnect: true,
+  withCredentials: true,
 });
-
+ 
 socket.on("connect", () => {
-  console.log("Socket connected:", socket.id);
-});
-
-socket.on("disconnect", (reason) => {
-  console.log("Socket disconnected:", reason);
-});
-
-socket.on("connect_error", (error) => {
-  console.error("Socket connection error:", error.message);
-});
-
-socket.io.on("reconnect_attempt", (attempt) => {
-  console.log("Socket reconnect attempt:", attempt);
-});
-
-socket.io.on("reconnect", (attempt) => {
   console.log(
-    "Socket reconnected successfully. Attempt:",
-    attempt,
+    "Socket connected successfully:",
+    socket.id,
+  );
+ 
+  console.log(
+    "Current transport:",
+    socket.io.engine.transport.name,
+  );
+ 
+  socket.io.engine.on(
+    "upgrade",
+    (transport) => {
+      console.log(
+        "Transport upgraded to:",
+        transport.name,
+      );
+    },
   );
 });
-
-socket.io.on("reconnect_error", (error) => {
-  console.error("Socket reconnect error:", error);
+ 
+socket.on("connect_error", (error) => {
+  console.error(
+    "Socket connection error:",
+    error.message,
+  );
 });
-
-socket.io.on("reconnect_failed", () => {
-  console.error("Socket reconnection failed");
+ 
+socket.on("disconnect", (reason) => {
+  console.log(
+    "Socket disconnected:",
+    reason,
+  );
+ 
+  if (
+    reason === "io server disconnect"
+  ) {
+    socket.connect();
+  }
 });
-
+ 
+socket.io.on(
+  "reconnect_attempt",
+  (attempt) => {
+    console.log(
+      "Socket reconnect attempt:",
+      attempt,
+    );
+  },
+);
+ 
+socket.io.on(
+  "reconnect",
+  (attempt) => {
+    console.log(
+      "Socket reconnected:",
+      attempt,
+    );
+  },
+);
+ 
+socket.io.on(
+  "reconnect_error",
+  (error) => {
+    console.error(
+      "Socket reconnect error:",
+      error.message,
+    );
+  },
+);
+ 
 export default socket;
  
