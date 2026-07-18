@@ -1,9 +1,127 @@
 @import "tailwindcss";
+
+/*
+|--------------------------------------------------------------------------
+| App Theme — change all colors in ONE place
+|--------------------------------------------------------------------------
+|
+| Every color in the UI comes from a token below. Edit a value here and
+| every background, button, panel and border across the whole app updates
+| automatically — no need to touch App.jsx or SplashScreen.jsx.
+|
+| Tailwind v4 turns each --color-* token into utilities, e.g.
+|   --color-surface  ->  bg-surface, text-surface, border-surface
+|   --color-accent   ->  bg-accent, focus:ring-accent, hover:bg-accent ...
+|
+*/
+@theme {
+  /* Surfaces (dark chrome) */
+  --color-surface: #202124;        /* app background */
+  --color-header: #18191a;         /* top bar */
+  --color-panel: #303134;          /* chat panel */
+  --color-control: #3c4043;        /* buttons + inputs */
+  --color-control-hover: #4b4f52;  /* button / input hover */
+  --color-line: #374151;           /* borders */
+
+  /* Actions / status */
+  --color-accent: #2563eb;         /* blue  — send, reconnect, focus ring */
+  --color-accent-hover: #1d4ed8;
+  --color-success: #16a34a;        /* green — join */
+  --color-success-hover: #15803d;
+  --color-warning: #f97316;        /* orange — disconnect, stop share */
+  --color-warning-hover: #ea580c;
+  --color-danger: #dc2626;         /* red   — mute, camera off, leave */
+  --color-danger-hover: #b91c1c;
+
+  /* Animations — used as animate-* utilities in the JSX */
+  --animate-fade-in: fade-in 0.4s ease-out both;
+  --animate-fade-in-up: fade-in-up 0.35s ease-out both;
+  --animate-fade-in-down: fade-in-down 0.35s ease-out both;
+  --animate-slide-in-right: slide-in-right 0.3s ease-out both;
+  --animate-pop: pop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  --animate-float: float 3s ease-in-out infinite;
+}
+
 @keyframes loading {
   from {
     transform: translateX(-100%);
   }
   to {
     transform: translateX(100%);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in-down {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+/* Respect users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
